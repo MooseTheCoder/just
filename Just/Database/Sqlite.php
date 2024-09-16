@@ -1,60 +1,128 @@
 <?php namespace Just\Database;
 
+use Just\Response;
+
 class Sqlite implements DatabaseInterface {
 
     private $connection;
 
     public function __construct($connectionDetails) {
-        $this->connection = new \SQLite3($connectionDetails['PATH']);
+        try{
+            $this->connection = new \SQLite3($connectionDetails['PATH']);
+        }catch(\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
+        }
     }
 
     public function insert($table, $data) {
-        $columns = implode(',', array_keys($data));
-        $values = implode("','", array_values($data));
-        $this->connection->query("INSERT INTO $table ($columns) VALUES ('$values')");
+        $columns = implode(', ', array_keys($data));
+        $values = implode(', :', array_keys($data));
+        $stmt = $this->connection->prepare("INSERT INTO $table ($columns) VALUES (:$values)");
+        foreach ($data as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+
+        try{
+            $stmt->execute();
+        }catch (\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
+        }
     }
 
-    public function update($table, $data, $where) {
-        $set = '';
-        foreach($data as $key => $value) {
-            $set .= "$key = '$value',";
+    public function update($table, $data, $where = []) {
+        $setValues = [];
+        $bindValues = [];
+
+        foreach ($data as $column => $value) {
+            $setValues[] = "$column = :$column";
+            $bindValues[":$column"] = $value;
         }
-        $set = rtrim($set, ',');
-        $this->connection->query("UPDATE $table SET $set WHERE $where");
+
+        $setString = implode(', ', $setValues);
+
+        $whereValues = [];
+        if(!empty($where)){
+            foreach ($where as $column => $value) {
+                $whereValues[] = "$column = :where$column";
+                $bindValues[":where$column"] = $value;
+            }
+            $whereString = implode(' AND ', $whereValues);
+        }
+
+        $stmt = $this->connection->prepare("UPDATE $table SET $setString" . (empty($where) ? '' : " WHERE $whereString"));
+
+        foreach ($bindValues as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+
+        try{
+            $stmt->execute();
+        }catch (\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
+        }
     }
 
     public function delete($table, $where) {
-        $this->connection->query("DELETE FROM $table WHERE $where");
+        $whereValues = [];
+        foreach ($where as $column => $value) {
+            $whereValues[] = "$column = :where$column";
+            $bindValues[":where$column"] = $value;
+        }
+        $whereString = implode(' AND ', $whereValues);
+
+        $stmt = $this->connection->prepare("DELETE FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
+
+        foreach ($bindValues as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+
+        try{
+            $stmt->execute();
+        }catch (\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
+        }
     }
 
-    public function select($table, $columns, $where) {
-        $columns = implode(',', $columns);
-        $this->connection->query("SELECT $columns FROM $table WHERE $where");
-    }
+    public function select($table, $where) {
+        $whereValues = [];
+        $bindValues = [];
+        if(!empty($where)){
+            foreach ($where as $column => $value) {
+                $whereValues[] = "$column = :$column";
+                $bindValues[":$column"] = $value;
+            }
+            $whereString = implode(' AND ', $whereValues);
+        }
 
-    public function count($table, $where) {
-        $this->connection->query("SELECT COUNT(*) FROM $table WHERE $where");
+        $stmt = $this->connection->prepare("SELECT * FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
+
+        foreach ($bindValues as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+
+        try{
+            $result = $stmt->execute();
+
+            while($row = $result->fetchArray(SQLITE3_ASSOC)){
+                $rows[] = $row;
+            }
+    
+            if(count($rows) === 1){
+                return $rows[0];
+            }
+
+            return $rows;
+        }catch (\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
+        }
     }
 
     public function query($query) {
-        $this->connection->query($query);
-    }
-
-    public function getById($table, $id) {
-        $this->connection->query("SELECT * FROM $table WHERE id = $id");
-    }
-
-    public function updateById($table, $data, $id) {
-        $set = '';
-        foreach($data as $key => $value) {
-            $set .= "$key = '$value',";
+        try{
+            return $this->connection->exec($query);
+        }catch (\Exception $e){
+            Response::json(['message'=>$e->getMessage()]);
         }
-        $set = rtrim($set, ',');
-        $this->connection->query("UPDATE $table SET $set WHERE id = $id");
-    }
-
-    public function deleteById($table, $id) {
-        $this->connection->query("DELETE FROM $table WHERE id = $id");
     }
 
 }
