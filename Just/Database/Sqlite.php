@@ -9,20 +9,21 @@ class Sqlite implements DatabaseInterface {
     public function __construct($connectionDetails) {
         try{
             $this->connection = new \SQLite3($connectionDetails['PATH']);
+            $this->connection->enableExceptions(true);
         }catch(\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
         }
     }
 
     public function insert($table, $data) {
-        $columns = implode(', ', array_keys($data));
-        $values = implode(', :', array_keys($data));
-        $stmt = $this->connection->prepare("INSERT INTO $table ($columns) VALUES (:$values)");
-        foreach ($data as $key => $value) {
-            $stmt->bindValue(":$key", $value);
-        }
-
         try{
+            $columns = implode(', ', array_keys($data));
+            $values = implode(', :', array_keys($data));
+            $stmt = $this->connection->prepare("INSERT INTO $table ($columns) VALUES (:$values)");
+            foreach ($data as $key => $value) {
+                $stmt->bindValue(":$key", $value);
+            }
+            
             $stmt->execute();
         }catch (\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
@@ -30,77 +31,75 @@ class Sqlite implements DatabaseInterface {
     }
 
     public function update($table, $data, $where = []) {
-        $setValues = [];
-        $bindValues = [];
-
-        foreach ($data as $column => $value) {
-            $setValues[] = "$column = :$column";
-            $bindValues[":$column"] = $value;
-        }
-
-        $setString = implode(', ', $setValues);
-
-        $whereValues = [];
-        if(!empty($where)){
-            foreach ($where as $column => $value) {
-                $whereValues[] = "$column = :where$column";
-                $bindValues[":where$column"] = $value;
-            }
-            $whereString = implode(' AND ', $whereValues);
-        }
-
-        $stmt = $this->connection->prepare("UPDATE $table SET $setString" . (empty($where) ? '' : " WHERE $whereString"));
-
-        foreach ($bindValues as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-
         try{
+            $setValues = [];
+            $bindValues = [];
+    
+            foreach ($data as $column => $value) {
+                $setValues[] = "$column = :$column";
+                $bindValues[":$column"] = $value;
+            }    
+            $setString = implode(', ', $setValues);
+
+            $whereValues = [];
+            if(!empty($where)){
+                foreach ($where as $column => $value) {
+                    $whereValues[] = "$column = :where$column";
+                    $bindValues[":where$column"] = $value;
+                }
+                $whereString = implode(' AND ', $whereValues);
+            }
+            $stmt = $this->connection->prepare("UPDATE $table SET $setString" . (empty($where) ? '' : " WHERE $whereString"));
+            foreach ($bindValues as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
             $stmt->execute();
+
         }catch (\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
         }
     }
 
     public function delete($table, $where) {
-        $whereValues = [];
-        foreach ($where as $column => $value) {
-            $whereValues[] = "$column = :where$column";
-            $bindValues[":where$column"] = $value;
-        }
-        $whereString = implode(' AND ', $whereValues);
-
-        $stmt = $this->connection->prepare("DELETE FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
-
-        foreach ($bindValues as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-
         try{
+            $whereValues = [];
+            foreach ($where as $column => $value) {
+                $whereValues[] = "$column = :where$column";
+                $bindValues[":where$column"] = $value;
+            }
+            $whereString = implode(' AND ', $whereValues);
+    
+            $stmt = $this->connection->prepare("DELETE FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
+    
+            foreach ($bindValues as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+
             $stmt->execute();
         }catch (\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
         }
+
     }
 
     public function select($table, $where) {
-        $whereValues = [];
-        $bindValues = [];
-        if(!empty($where)){
-            foreach ($where as $column => $value) {
-                $whereValues[] = "$column = :$column";
-                $bindValues[":$column"] = $value;
-            }
-            $whereString = implode(' AND ', $whereValues);
-        }
-
-        $stmt = $this->connection->prepare("SELECT * FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
-
-        foreach ($bindValues as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-
         try{
+            $whereValues = [];
+            $bindValues = [];
+            if(!empty($where)){
+                foreach ($where as $column => $value) {
+                    $whereValues[] = "$column = :$column";
+                    $bindValues[":$column"] = $value;
+                }
+                $whereString = implode(' AND ', $whereValues);
+            }
+    
+            $stmt = $this->connection->prepare("SELECT * FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
+    
+            foreach ($bindValues as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+
             $result = $stmt->execute();
 
             while($row = $result->fetchArray(SQLITE3_ASSOC)){
