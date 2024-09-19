@@ -133,4 +133,8 @@ class Api{
         // Store the route with the method
         $this->routes[$method][$route] = ['function'=>$function];
     }
+
+    public function getRoutes(){
+        return $this->routes;
+    }
 }
