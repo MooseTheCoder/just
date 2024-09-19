@@ -2,14 +2,21 @@
 
 use Just\Response;
 
-class Sqlite implements DatabaseInterface {
+class MySQL implements DatabaseInterface {
 
     private $connection;
 
     public function __construct($connectionDetails) {
         try{
-            $this->connection = new \SQLite3($connectionDetails['PATH']);
-            $this->connection->enableExceptions(true);
+            $this->connection = new \mysqli(
+                $connectionDetails['HOST'],
+                $connectionDetails['USER'],
+                $connectionDetails['PASS'],
+                $connectionDetails['DB']
+            );
+            if ($this->connection->connect_error) {
+                throw new \Exception($this->connection->connect_error);
+            }
         }catch(\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
         }
@@ -18,12 +25,16 @@ class Sqlite implements DatabaseInterface {
     public function insert($table, $data) {
         try{
             $columns = implode(', ', array_keys($data));
-            $values = implode(', :', array_keys($data));
-            $stmt = $this->connection->prepare("INSERT INTO $table ($columns) VALUES (:$values)");
-            foreach ($data as $key => $value) {
-                $stmt->bindValue(":$key", $value);
-            }
+
+            $values = str_repeat('?,', count(array_keys($data)));
+            $values = rtrim($values, ',');
             
+            $stmt = $this->connection->prepare("INSERT INTO $table ($columns) VALUES ($values)");
+            $parameters = [];
+            foreach ($data as $key=>$value) {
+                $parameters[] = $value;
+            }
+            $stmt->bind_param(str_repeat('s', count($parameters)), ...$parameters);
             $stmt->execute();
         }catch (\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
@@ -33,26 +44,24 @@ class Sqlite implements DatabaseInterface {
     public function update($table, $data, $where = []) {
         try{
             $setValues = [];
-            $bindValues = [];
+            $parameters = [];
     
             foreach ($data as $column => $value) {
-                $setValues[] = "$column = :$column";
-                $bindValues[":$column"] = $value;
+                $setValues[] = "$column = ?";
+                $parameters[] = $value;
             }    
             $setString = implode(', ', $setValues);
 
-            $whereValues = [];
             if(!empty($where)){
                 foreach ($where as $column => $value) {
-                    $whereValues[] = "$column = :where$column";
-                    $bindValues[":where$column"] = $value;
+                    $whereValues[] = "$column = ?";
+                    $parameters[] = $value;
                 }
                 $whereString = implode(' AND ', $whereValues);
             }
-            $stmt = $this->connection->prepare("UPDATE $table SET $setString" . (empty($where) ? '' : " WHERE $whereString"));
-            foreach ($bindValues as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
+            
+            $stmt = $this->connection->prepare("UPDATE $table SET $setString"  . (empty($where) ? '' : " WHERE $whereString"));
+            $stmt->bind_param(str_repeat('s', count($parameters)), ...$parameters);
             $stmt->execute();
 
         }catch (\Exception $e){
@@ -63,18 +72,15 @@ class Sqlite implements DatabaseInterface {
     public function delete($table, $where) {
         try{
             $whereValues = [];
+            $parameters = [];
             foreach ($where as $column => $value) {
-                $whereValues[] = "$column = :where$column";
-                $bindValues[":where$column"] = $value;
+                $whereValues[] = "$column = ?";
+                $parameters[] = $value;
             }
             $whereString = implode(' AND ', $whereValues);
     
             $stmt = $this->connection->prepare("DELETE FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
-    
-            foreach ($bindValues as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-
+            $stmt->bind_param(str_repeat('s', count($parameters)), ...$parameters);
             $stmt->execute();
         }catch (\Exception $e){
             Response::json(['message'=>$e->getMessage()]);
@@ -85,24 +91,25 @@ class Sqlite implements DatabaseInterface {
     public function select($table, $where) {
         try{
             $whereValues = [];
-            $bindValues = [];
+            $parameters = [];
             if(!empty($where)){
                 foreach ($where as $column => $value) {
-                    $whereValues[] = "$column = :$column";
-                    $bindValues[":$column"] = $value;
+                    $whereValues[] = "$column = ?";
+                    $parameters[] = $value;
                 }
                 $whereString = implode(' AND ', $whereValues);
             }
     
             $stmt = $this->connection->prepare("SELECT * FROM $table" . (empty($where) ? '' : " WHERE $whereString"));
-    
-            foreach ($bindValues as $key => $value) {
-                $stmt->bindValue($key, $value);
+
+            if(!empty($where)){
+                $stmt->bind_param(str_repeat('s', count($parameters)), ...$parameters);   
             }
-
-            $result = $stmt->execute();
-
-            while($row = $result->fetchArray(SQLITE3_ASSOC)){
+            $stmt->execute();
+            $result = $stmt->get_result();
+    
+            $rows = [];
+            while($row = $result->fetch_assoc()){
                 $rows[] = $row;
             }
     

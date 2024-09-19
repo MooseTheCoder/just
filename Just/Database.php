@@ -9,6 +9,15 @@ class Database {
         if($dbType === 'SQLITE'){
             $this->dbClass = new \Just\Database\Sqlite(['PATH'=>Environment::get('DB_PATH')]);
         }
+
+        if($dbType === 'MYSQL'){
+            $this->dbClass = new \Just\Database\MySQL([
+                'HOST'=>Environment::get('HOST'),
+                'USER'=>Environment::get('USER'),
+                'PASS'=>Environment::get('PASS'),
+                'DB'=>Environment::get('DB')
+            ]);
+        }
     }
 
     public function __call($name, $arguments){
