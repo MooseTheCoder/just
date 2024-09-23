@@ -25,7 +25,7 @@ class Api{
         }
         
         // Add the HTTP method to the arguments
-        $args[] = strtoupper($name);
+        array_unshift($args, strtoupper($name));
         
         // Route the request with the provided arguments
         $this->route(...$args);
@@ -97,6 +97,13 @@ class Api{
             Response::json($this->notFound, 404);
         }
 
+        // Before we call the method, ensure all required parameters are set if defined
+        $route = $this->routes[Request::method()][$routeCall];
+
+        if(isset($route['request']) && isset($route['request']['input']['required'])){
+            Request::requires($route['request']['input']['required']);
+        }
+        
         // Get the class and method to call
         $routeCall = explode('@', $this->routes[Request::method()][$routeCall]['function']);
 
@@ -129,9 +136,15 @@ class Api{
      * @param string $method The HTTP method to use for the route.
      * @return void
      */
-    public function route($route, $function, $method='GET'){
+    public function route($method, $route, $function, $parameters=[]){
         // Store the route with the method
-        $this->routes[$method][$route] = ['function'=>$function];
+        $routeArray = ['function'=>$function];
+
+        if(!empty($parameters)){
+            $routeArray = array_merge($routeArray, $parameters);
+        }
+
+        $this->routes[$method][$route] = $routeArray;
     }
 
     public function getRoutes(){

@@ -8,12 +8,10 @@ use Just\Database;
 class ExampleController
 {
     public function postExample(){
-        Request::requires(['name']);
         Response::json(['message'=>'Hello ' . Request::input()->name]);
     }
 
     public function getExample(){
-        Request::requires(['name']);
         Response::json(['message'=>'Hello ' . Request::input()->name]);
     }
 
