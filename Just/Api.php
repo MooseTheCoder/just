@@ -71,7 +71,7 @@ class Api{
                 // Loop through all parts of the route
                 foreach($routeParts as $index=>$part){
                     // Check if the part is equal to the URI part or if it starts with a { and the URI part is set
-                    if($part === $uriParts[$index] || $part[0] === '{' && isset($uriParts[$index])){
+                    if($part === $uriParts[$index] || (strlen($part) && $part[0] === '{' && isset($uriParts[$index]))){
                         // If so, set the vars
                         if(strlen($part) && $part[0] === '{'){
                             $partName = substr($part, 1, -1);
@@ -133,4 +133,5 @@ class Api{
         // Store the route with the method
         $this->routes[$method][$route] = ['function'=>$function];
     }
+
 }
