@@ -25,10 +25,8 @@ class Request {
      * Get all user input.
      * 
      * @param  boolean $assoc Return the input as an associative array.
-     * @return array The user input.
+     * @return array|object The user input.
      */
-
-    /** @disregard P1006 Function can return an object or an array. */
     public static function input($assoc=false){
         // Get the input from the standard sources
         $inputArray = array_merge($_GET, $_POST);
@@ -68,4 +66,5 @@ class Request {
         // If all required parameters are set, return true
         return true;
     }
+
 }
